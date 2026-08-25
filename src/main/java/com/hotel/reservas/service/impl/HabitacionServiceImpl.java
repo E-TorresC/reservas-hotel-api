@@ -10,7 +10,7 @@ import com.hotel.reservas.repository.HabitacionRepository;
 import com.hotel.reservas.repository.HotelRepository;
 import com.hotel.reservas.repository.TipoHabitacionRepository;
 import com.hotel.reservas.service.HabitacionService;
-import com.hotel.reservas.util.HabitacionMapper;
+import com.hotel.reservas.mapper.HabitacionMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
