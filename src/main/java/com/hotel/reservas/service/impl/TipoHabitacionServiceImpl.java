@@ -6,7 +6,7 @@ import com.hotel.reservas.entity.TipoHabitacion;
 import com.hotel.reservas.exception.ResourceNotFoundException;
 import com.hotel.reservas.repository.TipoHabitacionRepository;
 import com.hotel.reservas.service.TipoHabitacionService;
-import com.hotel.reservas.util.TipoHabitacionMapper;
+import com.hotel.reservas.mapper.TipoHabitacionMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
