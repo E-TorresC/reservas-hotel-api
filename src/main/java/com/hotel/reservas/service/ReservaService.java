@@ -1,5 +1,6 @@
 package com.hotel.reservas.service;
 
+import com.hotel.reservas.dto.request.ReservaFilter;
 import com.hotel.reservas.dto.request.ReservaRequest;
 import com.hotel.reservas.dto.response.ReservaResponse;
 import org.springframework.data.domain.Page;
@@ -18,4 +19,7 @@ public interface ReservaService {
     ReservaResponse modificarFechasOObjetos(Long id, ReservaRequest request);
 
     void cancelar(Long id);
+
+    // NUEVO METODO PARA FILTROS DINÁMICOS CON SPECIFICATIONS
+    Page<ReservaResponse> buscarConFiltros(ReservaFilter filter, Pageable pageable);
 }

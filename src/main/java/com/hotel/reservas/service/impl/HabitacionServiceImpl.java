@@ -1,5 +1,6 @@
 package com.hotel.reservas.service.impl;
 
+import com.hotel.reservas.dto.request.HabitacionFilter;
 import com.hotel.reservas.dto.request.HabitacionRequest;
 import com.hotel.reservas.dto.response.HabitacionResponse;
 import com.hotel.reservas.entity.Habitacion;
@@ -9,11 +10,13 @@ import com.hotel.reservas.exception.ResourceNotFoundException;
 import com.hotel.reservas.repository.HabitacionRepository;
 import com.hotel.reservas.repository.HotelRepository;
 import com.hotel.reservas.repository.TipoHabitacionRepository;
+import com.hotel.reservas.repository.specification.HabitacionSpecification;
 import com.hotel.reservas.service.HabitacionService;
 import com.hotel.reservas.mapper.HabitacionMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -103,5 +106,12 @@ public class HabitacionServiceImpl implements HabitacionService {
     @Transactional
     public void eliminarLogicamente(Long id) {
         cambiarEstado(id, "INACTIVA");
+    }
+
+    @Override
+    public Page<HabitacionResponse> buscarConFiltros(HabitacionFilter filter, Pageable pageable) {
+        Specification<Habitacion> spec = HabitacionSpecification.conFiltros(filter);
+        return habitacionRepository.findAll(spec, pageable)
+                .map(HabitacionMapper::toResponse);
     }
 }

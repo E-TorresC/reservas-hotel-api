@@ -1,5 +1,6 @@
 package com.hotel.reservas.service.impl;
 
+import com.hotel.reservas.dto.request.ReservaFilter;
 import com.hotel.reservas.dto.request.ReservaRequest;
 import com.hotel.reservas.dto.response.ReservaResponse;
 import com.hotel.reservas.entity.Cliente;
@@ -11,11 +12,13 @@ import com.hotel.reservas.exception.ResourceNotFoundException;
 import com.hotel.reservas.repository.ClienteRepository;
 import com.hotel.reservas.repository.HabitacionRepository;
 import com.hotel.reservas.repository.ReservaRepository;
+import com.hotel.reservas.repository.specification.ReservaSpecification;
 import com.hotel.reservas.service.ReservaService;
 import com.hotel.reservas.mapper.ReservaMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -184,5 +187,12 @@ public class ReservaServiceImpl implements ReservaService {
         // RN-07: Cancelación (Cambio de estado sin borrado físico)
         reserva.setEstado("CANCELADA");
         reservaRepository.save(reserva);
+    }
+
+    @Override
+    public Page<ReservaResponse> buscarConFiltros(ReservaFilter filter, Pageable pageable) {
+        Specification<Reserva> spec = ReservaSpecification.conFiltros(filter);
+        return reservaRepository.findAll(spec, pageable)
+                .map(ReservaMapper::toResponse);
     }
 }

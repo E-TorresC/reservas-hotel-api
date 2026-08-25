@@ -1,5 +1,6 @@
 package com.hotel.reservas.service;
 
+import com.hotel.reservas.dto.request.HabitacionFilter;
 import com.hotel.reservas.dto.request.HabitacionRequest;
 import com.hotel.reservas.dto.response.HabitacionResponse;
 import org.springframework.data.domain.Page;
@@ -22,4 +23,7 @@ public interface HabitacionService {
     void cambiarEstado(Long id, String nuevoEstado);
 
     void eliminarLogicamente(Long id);
+
+    //METODO PARA FILTROS DINÁMICOS CON SPECIFICATIONS
+    Page<HabitacionResponse> buscarConFiltros(HabitacionFilter filter, Pageable pageable);
 }
