@@ -1,5 +1,6 @@
 package com.hotel.reservas.controller;
 
+import com.hotel.reservas.dto.request.ReservaFilter;
 import com.hotel.reservas.dto.request.ReservaRequest;
 import com.hotel.reservas.dto.response.ReservaResponse;
 import com.hotel.reservas.service.ReservaService;
@@ -53,5 +54,12 @@ public class ReservaController {
     public ResponseEntity<Void> cancelar(@PathVariable Long id) {
         reservaService.cancelar(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/busqueda")
+    public ResponseEntity<Page<ReservaResponse>> buscarConFiltros(
+            @ModelAttribute ReservaFilter filter,
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(reservaService.buscarConFiltros(filter, pageable));
     }
 }

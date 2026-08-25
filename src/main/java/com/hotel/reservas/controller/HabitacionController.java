@@ -1,5 +1,6 @@
 package com.hotel.reservas.controller;
 
+import com.hotel.reservas.dto.request.HabitacionFilter;
 import com.hotel.reservas.dto.request.HabitacionRequest;
 import com.hotel.reservas.dto.response.HabitacionResponse;
 import com.hotel.reservas.service.HabitacionService;
@@ -68,5 +69,12 @@ public class HabitacionController {
     public ResponseEntity<Void> eliminarLogicamente(@PathVariable Long id) {
         habitacionService.eliminarLogicamente(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/busqueda")
+    public ResponseEntity<Page<HabitacionResponse>> buscarConFiltros(
+            @ModelAttribute HabitacionFilter filter,
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(habitacionService.buscarConFiltros(filter, pageable));
     }
 }
