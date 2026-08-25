@@ -34,7 +34,6 @@ public class DisponibilidadController {
                 idTipoHabitacion,
                 pageable
         );
-
         return ResponseEntity.ok(disponibles);
     }
 }
