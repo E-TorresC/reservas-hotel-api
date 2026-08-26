@@ -1,4 +1,4 @@
-package com.hotel.reservas.mapper;
+package com.hotel.reservas.util.mapper;
 
 import com.hotel.reservas.dto.request.HotelRequest;
 import com.hotel.reservas.dto.response.HotelResponse;
