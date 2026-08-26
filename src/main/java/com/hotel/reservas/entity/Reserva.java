@@ -36,15 +36,21 @@ public class Reserva {
     @Column(name = "fecha_reserva", nullable = false, updatable = false)
     private LocalDateTime fechaReserva;
 
+    @Column(name = "fecha_expiracion")
+    private LocalDateTime fechaExpiracion;
+
     @Column(name = "total", nullable = false, precision = 12, scale = 2)
     private BigDecimal total;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "estado", nullable = false, length = 20)
-    private String estado; // PENDIENTE, CONFIRMADA, CANCELADA, FINALIZADA
+    private EstadoReserva estado;
 
     @PrePersist
     public void prePersist() {
-        this.fechaReserva = LocalDateTime.now();
+        if (this.fechaReserva == null) {
+            this.fechaReserva = LocalDateTime.now();
+        }
     }
 
     @OneToMany(mappedBy = "reserva", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
