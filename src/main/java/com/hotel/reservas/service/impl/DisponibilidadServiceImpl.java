@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -36,11 +37,16 @@ public class DisponibilidadServiceImpl implements DisponibilidadService {
             throw new BusinessRuleException("La fecha de entrada debe ser estrictamente anterior a la fecha de salida");
         }
 
+        // Obtener la fecha/hora actual para filtrar reservas PENDIETE expiradas
+        LocalDateTime ahora = LocalDateTime.now();
+
+        // CORRECCIÓN AQUÍ: Se añade el argumento 'ahora' antes de 'pageable'
         Page<Habitacion> habitaciones = habitacionRepository.buscarDisponibles(
                 fechaEntrada,
                 fechaSalida,
                 idHotel,
                 idTipoHabitacion,
+                ahora,
                 pageable
         );
 

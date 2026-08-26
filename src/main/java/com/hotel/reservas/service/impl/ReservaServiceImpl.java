@@ -3,10 +3,7 @@ package com.hotel.reservas.service.impl;
 import com.hotel.reservas.dto.request.ReservaFilter;
 import com.hotel.reservas.dto.request.ReservaRequest;
 import com.hotel.reservas.dto.response.ReservaResponse;
-import com.hotel.reservas.entity.Cliente;
-import com.hotel.reservas.entity.Habitacion;
-import com.hotel.reservas.entity.Reserva;
-import com.hotel.reservas.entity.ReservaHabitacion;
+import com.hotel.reservas.entity.*;
 import com.hotel.reservas.exception.BusinessRuleException;
 import com.hotel.reservas.exception.ResourceNotFoundException;
 import com.hotel.reservas.repository.ClienteRepository;
@@ -14,7 +11,7 @@ import com.hotel.reservas.repository.HabitacionRepository;
 import com.hotel.reservas.repository.ReservaRepository;
 import com.hotel.reservas.repository.specification.ReservaSpecification;
 import com.hotel.reservas.service.ReservaService;
-import com.hotel.reservas.mapper.ReservaMapper;
+import com.hotel.reservas.util.mapper.ReservaMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,12 +36,10 @@ public class ReservaServiceImpl implements ReservaService {
     @Override
     @Transactional
     public ReservaResponse crear(ReservaRequest request) {
-        // RN-01: Fechas válidas
         if (!request.getFechaEntrada().isBefore(request.getFechaSalida())) {
             throw new BusinessRuleException("La fecha de entrada debe ser estrictamente anterior a la fecha de salida");
         }
 
-        // RN-06: Cliente activo
         Cliente cliente = clienteRepository.findById(request.getIdCliente())
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado con ID: " + request.getIdCliente()));
 
@@ -51,9 +47,15 @@ public class ReservaServiceImpl implements ReservaService {
             throw new BusinessRuleException("No se pueden crear reservas para clientes inactivos");
         }
 
-        // RN-03: Detección de solapamientos
-        if (reservaRepository.existeSolapamiento(request.getHabitacionesIds(), request.getFechaEntrada(), request.getFechaSalida(), null)) {
-            throw new BusinessRuleException("Una o más habitaciones seleccionadas ya presentan un conflicto de reserva en las fechas indicadas");
+        LocalDateTime ahora = LocalDateTime.now();
+
+        List<Habitacion> habitaciones = habitacionRepository.findAllByIdWithPessimisticLock(request.getHabitacionesIds());
+        if (habitaciones.size() != request.getHabitacionesIds().size()) {
+            throw new ResourceNotFoundException("Una o más habitaciones no existen en el sistema");
+        }
+
+        if (reservaRepository.existeSolapamiento(request.getHabitacionesIds(), request.getFechaEntrada(), request.getFechaSalida(), ahora, null)) {
+            throw new BusinessRuleException("Una o más habitaciones seleccionadas presentan un conflicto con una reserva activa o pendiente no expirada");
         }
 
         long noches = ChronoUnit.DAYS.between(request.getFechaEntrada(), request.getFechaSalida());
@@ -64,15 +66,13 @@ public class ReservaServiceImpl implements ReservaService {
                 .cliente(cliente)
                 .fechaEntrada(request.getFechaEntrada())
                 .fechaSalida(request.getFechaSalida())
-                .estado("CONFIRMADA")
+                .fechaReserva(ahora)
+                .fechaExpiracion(ahora.plusMinutes(15))
+                .estado(EstadoReserva.PENDIENTE)
                 .total(BigDecimal.ZERO)
                 .build();
 
-        for (Long habitacionId : request.getHabitacionesIds()) {
-            Habitacion habitacion = habitacionRepository.findById(habitacionId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Habitación no encontrada con ID: " + habitacionId));
-
-            // RN-04 & RN-05: Estado de la habitación
+        for (Habitacion habitacion : habitaciones) {
             if (!"DISPONIBLE".equalsIgnoreCase(habitacion.getEstado())) {
                 throw new BusinessRuleException("La habitación " + habitacion.getNumero() + " no está operativa (Estado: " + habitacion.getEstado() + ")");
             }
@@ -121,12 +121,20 @@ public class ReservaServiceImpl implements ReservaService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Page<ReservaResponse> buscarConFiltros(ReservaFilter filter, Pageable pageable) {
+        Specification<Reserva> spec = ReservaSpecification.conFiltros(filter);
+        return reservaRepository.findAll(spec, pageable)
+                .map(ReservaMapper::toResponse);
+    }
+
+    @Override
     @Transactional
     public ReservaResponse modificarFechasOObjetos(Long id, ReservaRequest request) {
-        Reserva reserva = reservaRepository.findById(id)
+        Reserva reserva = reservaRepository.findByIdWithPessimisticLock(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reserva no encontrada con ID: " + id));
 
-        if ("CANCELADA".equalsIgnoreCase(reserva.getEstado()) || "FINALIZADA".equalsIgnoreCase(reserva.getEstado())) {
+        if (reserva.getEstado() == EstadoReserva.CANCELADA || reserva.getEstado() == EstadoReserva.FINALIZADA) {
             throw new BusinessRuleException("No se puede modificar una reserva en estado " + reserva.getEstado());
         }
 
@@ -134,8 +142,9 @@ public class ReservaServiceImpl implements ReservaService {
             throw new BusinessRuleException("La fecha de entrada debe ser estrictamente anterior a la fecha de salida");
         }
 
-        // RN-08: Revalidación de solapamiento al modificar
-        if (reservaRepository.existeSolapamiento(request.getHabitacionesIds(), request.getFechaEntrada(), request.getFechaSalida(), id)) {
+        LocalDateTime ahora = LocalDateTime.now();
+
+        if (reservaRepository.existeSolapamiento(request.getHabitacionesIds(), request.getFechaEntrada(), request.getFechaSalida(), ahora, id)) {
             throw new BusinessRuleException("El nuevo período de reserva genera un conflicto con una reserva existente");
         }
 
@@ -177,22 +186,14 @@ public class ReservaServiceImpl implements ReservaService {
     @Override
     @Transactional
     public void cancelar(Long id) {
-        Reserva reserva = reservaRepository.findById(id)
+        Reserva reserva = reservaRepository.findByIdWithPessimisticLock(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reserva no encontrada con ID: " + id));
 
-        if ("CANCELADA".equalsIgnoreCase(reserva.getEstado())) {
+        if (reserva.getEstado() == EstadoReserva.CANCELADA) {
             throw new BusinessRuleException("La reserva ya se encuentra cancelada");
         }
 
-        // RN-07: Cancelación (Cambio de estado sin borrado físico)
-        reserva.setEstado("CANCELADA");
+        reserva.setEstado(EstadoReserva.CANCELADA);
         reservaRepository.save(reserva);
-    }
-
-    @Override
-    public Page<ReservaResponse> buscarConFiltros(ReservaFilter filter, Pageable pageable) {
-        Specification<Reserva> spec = ReservaSpecification.conFiltros(filter);
-        return reservaRepository.findAll(spec, pageable)
-                .map(ReservaMapper::toResponse);
     }
 }

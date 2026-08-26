@@ -1,5 +1,6 @@
 package com.hotel.reservas.dto.response;
 
+import com.hotel.reservas.entity.EstadoReserva;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -20,8 +21,9 @@ public class ReservaResponse {
     private LocalDate fechaEntrada;
     private LocalDate fechaSalida;
     private LocalDateTime fechaReserva;
+    private LocalDateTime fechaExpiracion;
     private BigDecimal total;
-    private String estado;
+    private EstadoReserva estado;
     private List<ReservaHabitacionResponse> habitaciones;
 
     @Getter
