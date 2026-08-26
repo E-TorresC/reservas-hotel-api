@@ -2,6 +2,7 @@ package com.hotel.reservas.service.impl;
 
 import com.hotel.reservas.dto.request.PagoRequest;
 import com.hotel.reservas.dto.response.PagoResponse;
+import com.hotel.reservas.entity.EstadoReserva;
 import com.hotel.reservas.entity.Pago;
 import com.hotel.reservas.entity.Reserva;
 import com.hotel.reservas.exception.BusinessRuleException;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -29,21 +31,39 @@ public class PagoServiceImpl implements PagoService {
     @Override
     @Transactional
     public PagoResponse registrarPago(PagoRequest request) {
-        // RN-10: Validar que el monto sea mayor que 0
         if (request.getMonto() == null || request.getMonto().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessRuleException("El monto del pago debe ser estrictamente mayor a 0");
         }
 
-        Reserva reserva = reservaRepository.findById(request.getIdReserva())
+        Reserva reserva = reservaRepository.findByIdWithPessimisticLock(request.getIdReserva())
                 .orElseThrow(() -> new ResourceNotFoundException("Reserva no encontrada con ID: " + request.getIdReserva()));
 
-        // RN-10: Validar estado de la reserva para permitir pagos
-        if ("CANCELADA".equalsIgnoreCase(reserva.getEstado())) {
-            throw new BusinessRuleException("No se pueden registrar pagos para una reserva en estado CANCELADA");
+        LocalDateTime ahora = LocalDateTime.now();
+
+        if (reserva.getEstado() == EstadoReserva.CANCELADA) {
+            throw new BusinessRuleException("No se puede pagar una reserva CANCELADA");
+        }
+
+        if (reserva.getEstado() == EstadoReserva.CONFIRMADA) {
+            throw new BusinessRuleException("La reserva ya fue CONFIRMADA previamente");
+        }
+
+        if (reserva.getEstado() == EstadoReserva.FINALIZADA) {
+            throw new BusinessRuleException("No se puede pagar una reserva FINALIZADA");
+        }
+
+        if (reserva.getEstado() == EstadoReserva.PENDIENTE && reserva.getFechaExpiracion().isBefore(ahora)) {
+            reserva.setEstado(EstadoReserva.CANCELADA);
+            reservaRepository.save(reserva);
+            throw new BusinessRuleException("La reserva PENDIENTE ha expirado. Por favor, realice una nueva reserva");
         }
 
         Pago pago = PagoMapper.toEntity(request, reserva);
         Pago guardado = pagoRepository.save(pago);
+
+        reserva.setEstado(EstadoReserva.CONFIRMADA);
+        reservaRepository.save(reserva);
+
         return PagoMapper.toResponse(guardado);
     }
 

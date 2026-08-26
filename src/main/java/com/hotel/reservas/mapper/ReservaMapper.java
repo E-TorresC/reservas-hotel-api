@@ -15,6 +15,7 @@ public class ReservaMapper {
                 .fechaEntrada(entity.getFechaEntrada())
                 .fechaSalida(entity.getFechaSalida())
                 .fechaReserva(entity.getFechaReserva())
+                .fechaExpiracion(entity.getFechaExpiracion())
                 .total(entity.getTotal())
                 .estado(entity.getEstado())
                 .habitaciones(entity.getReservaHabitaciones().stream()
