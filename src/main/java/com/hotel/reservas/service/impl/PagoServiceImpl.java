@@ -10,7 +10,7 @@ import com.hotel.reservas.exception.ResourceNotFoundException;
 import com.hotel.reservas.repository.PagoRepository;
 import com.hotel.reservas.repository.ReservaRepository;
 import com.hotel.reservas.service.PagoService;
-import com.hotel.reservas.util.PagoMapper;
+import com.hotel.reservas.util.mapper.PagoMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
