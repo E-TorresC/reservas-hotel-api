@@ -35,13 +35,11 @@ public class PagoServiceImpl implements PagoService {
             throw new BusinessRuleException("El monto del pago debe ser estrictamente mayor a 0");
         }
 
-        // 1. Adquisición de bloqueo pesimista sobre la Reserva
         Reserva reserva = reservaRepository.findByIdWithPessimisticLock(request.getIdReserva())
                 .orElseThrow(() -> new ResourceNotFoundException("Reserva no encontrada con ID: " + request.getIdReserva()));
 
         LocalDateTime ahora = LocalDateTime.now();
 
-        // 2. Validaciones estrictas de estado y expiración dentro del bloqueo
         if (reserva.getEstado() == EstadoReserva.CANCELADA) {
             throw new BusinessRuleException("No se puede pagar una reserva CANCELADA");
         }
@@ -55,13 +53,11 @@ public class PagoServiceImpl implements PagoService {
         }
 
         if (reserva.getEstado() == EstadoReserva.PENDIENTE && reserva.getFechaExpiracion().isBefore(ahora)) {
-            // Se marca cancelada en caliente si la transacción del pago detecta la expiración primero
             reserva.setEstado(EstadoReserva.CANCELADA);
             reservaRepository.save(reserva);
             throw new BusinessRuleException("La reserva PENDIENTE ha expirado. Por favor, realice una nueva reserva");
         }
 
-        // 3. Registro del Pago y confirmación de la Reserva
         Pago pago = PagoMapper.toEntity(request, reserva);
         Pago guardado = pagoRepository.save(pago);
 

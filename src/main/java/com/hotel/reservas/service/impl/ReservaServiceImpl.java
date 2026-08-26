@@ -49,13 +49,11 @@ public class ReservaServiceImpl implements ReservaService {
 
         LocalDateTime ahora = LocalDateTime.now();
 
-        // 1. Bloqueo Pesimista sobre habitaciones para evitar race condition en creación
         List<Habitacion> habitaciones = habitacionRepository.findAllByIdWithPessimisticLock(request.getHabitacionesIds());
         if (habitaciones.size() != request.getHabitacionesIds().size()) {
             throw new ResourceNotFoundException("Una o más habitaciones no existen en el sistema");
         }
 
-        // 2. Verificar disponibilidad ignorando reservas PENDIENTE que ya expiraron
         if (reservaRepository.existeSolapamiento(request.getHabitacionesIds(), request.getFechaEntrada(), request.getFechaSalida(), ahora, null)) {
             throw new BusinessRuleException("Una o más habitaciones seleccionadas presentan un conflicto con una reserva activa o pendiente no expirada");
         }
@@ -69,7 +67,7 @@ public class ReservaServiceImpl implements ReservaService {
                 .fechaEntrada(request.getFechaEntrada())
                 .fechaSalida(request.getFechaSalida())
                 .fechaReserva(ahora)
-                .fechaExpiracion(ahora.plusMinutes(15)) // Expiración explícita a 15 minutos
+                .fechaExpiracion(ahora.plusMinutes(15))
                 .estado(EstadoReserva.PENDIENTE)
                 .total(BigDecimal.ZERO)
                 .build();
@@ -123,24 +121,29 @@ public class ReservaServiceImpl implements ReservaService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Page<ReservaResponse> buscarConFiltros(ReservaFilter filter, Pageable pageable) {
+        Specification<Reserva> spec = ReservaSpecification.conFiltros(filter);
+        return reservaRepository.findAll(spec, pageable)
+                .map(ReservaMapper::toResponse);
+    }
+
+    @Override
     @Transactional
     public ReservaResponse modificarFechasOObjetos(Long id, ReservaRequest request) {
         Reserva reserva = reservaRepository.findByIdWithPessimisticLock(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Reserva no encontrada con ID: " + id));
 
-        // 1. Validar estados usando el enum EstadoReserva
         if (reserva.getEstado() == EstadoReserva.CANCELADA || reserva.getEstado() == EstadoReserva.FINALIZADA) {
             throw new BusinessRuleException("No se puede modificar una reserva en estado " + reserva.getEstado());
         }
 
-        // 2. Validar rango de fechas (RN-01)
         if (!request.getFechaEntrada().isBefore(request.getFechaSalida())) {
-            throw new BusinessRuleException("La fecha de entrada debe ser strictly anterior a la fecha de salida");
+            throw new BusinessRuleException("La fecha de entrada debe ser estrictamente anterior a la fecha de salida");
         }
 
         LocalDateTime ahora = LocalDateTime.now();
 
-        // 3. RN-08: Revalidación de solapamiento pasando el parámetro 'ahora' requerido por el repositorio
         if (reservaRepository.existeSolapamiento(request.getHabitacionesIds(), request.getFechaEntrada(), request.getFechaSalida(), ahora, id)) {
             throw new BusinessRuleException("El nuevo período de reserva genera un conflicto con una reserva existente");
         }
@@ -192,12 +195,5 @@ public class ReservaServiceImpl implements ReservaService {
 
         reserva.setEstado(EstadoReserva.CANCELADA);
         reservaRepository.save(reserva);
-    }
-
-    @Override
-    public Page<ReservaResponse> buscarConFiltros(ReservaFilter filter, Pageable pageable) {
-        Specification<Reserva> spec = ReservaSpecification.conFiltros(filter);
-        return reservaRepository.findAll(spec, pageable)
-                .map(ReservaMapper::toResponse);
     }
 }

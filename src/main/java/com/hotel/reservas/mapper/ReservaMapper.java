@@ -15,9 +15,9 @@ public class ReservaMapper {
                 .fechaEntrada(entity.getFechaEntrada())
                 .fechaSalida(entity.getFechaSalida())
                 .fechaReserva(entity.getFechaReserva())
+                .fechaExpiracion(entity.getFechaExpiracion())
                 .total(entity.getTotal())
-                // CORRECCIÓN AQUÍ: Convertir enum a String
-                .estado(entity.getEstado() != null ? entity.getEstado().name() : null)
+                .estado(entity.getEstado())
                 .habitaciones(entity.getReservaHabitaciones().stream()
                         .map(rh -> ReservaResponse.ReservaHabitacionResponse.builder()
                                 .idReservaHabitacion(rh.getIdReservaHabitacion())
