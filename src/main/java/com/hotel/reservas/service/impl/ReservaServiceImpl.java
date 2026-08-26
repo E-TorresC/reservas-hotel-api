@@ -38,12 +38,12 @@ public class ReservaServiceImpl implements ReservaService {
     @Override
     @Transactional
     public ReservaResponse crear(ReservaRequest request) {
-        // RN-01: Fechas válidas
+        // 1. RN-01: Fechas válidas
         if (!request.getFechaEntrada().isBefore(request.getFechaSalida())) {
-            throw new BusinessRuleException("La fecha de entrada debe ser estrictamente anterior a la fecha de salida");
+            throw new BusinessRuleException("La fecha de entrada debe ser strictly anterior a la fecha de salida");
         }
 
-        // RN-06: Cliente activo
+        // 2. RN-06: Cliente activo
         Cliente cliente = clienteRepository.findById(request.getIdCliente())
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado con ID: " + request.getIdCliente()));
 
@@ -51,7 +51,13 @@ public class ReservaServiceImpl implements ReservaService {
             throw new BusinessRuleException("No se pueden crear reservas para clientes inactivos");
         }
 
-        // RN-03: Detección de solapamientos
+        // 3. Adquisición de Bloqueo Pesimista sobre las habitaciones solicitadas
+        List<Habitacion> habitaciones = habitacionRepository.findAllByIdWithPessimisticLock(request.getHabitacionesIds());
+        if (habitaciones.size() != request.getHabitacionesIds().size()) {
+            throw new ResourceNotFoundException("Una o más habitaciones no existen en el sistema");
+        }
+
+        // 4. RN-03: Verificación de solapamiento bajo aislamiento transaccional
         if (reservaRepository.existeSolapamiento(request.getHabitacionesIds(), request.getFechaEntrada(), request.getFechaSalida(), null)) {
             throw new BusinessRuleException("Una o más habitaciones seleccionadas ya presentan un conflicto de reserva en las fechas indicadas");
         }
@@ -68,11 +74,8 @@ public class ReservaServiceImpl implements ReservaService {
                 .total(BigDecimal.ZERO)
                 .build();
 
-        for (Long habitacionId : request.getHabitacionesIds()) {
-            Habitacion habitacion = habitacionRepository.findById(habitacionId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Habitación no encontrada con ID: " + habitacionId));
-
-            // RN-04 & RN-05: Estado de la habitación
+        for (Habitacion habitacion : habitaciones) {
+            // RN-04 & RN-05: Validar operatividad
             if (!"DISPONIBLE".equalsIgnoreCase(habitacion.getEstado())) {
                 throw new BusinessRuleException("La habitación " + habitacion.getNumero() + " no está operativa (Estado: " + habitacion.getEstado() + ")");
             }
